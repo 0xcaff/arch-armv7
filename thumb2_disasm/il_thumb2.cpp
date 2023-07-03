@@ -1354,6 +1354,56 @@ bool GetLowLevelILForNEONInstruction(Architecture* arch, LowLevelILFunction& il,
 	case armv7::ARMV7_VSUB:
 		il.AddInstruction(WriteArithOperand(il, instr, il.Sub(GetRegisterSize(instr, 0), ReadILOperand(il, instr, 1), ReadILOperand(il, instr, 2))));
 		break;
+    case armv7::ARMV7_VLD1: {
+        uint32_t data_type_size_bytes = 1 << instr->fields[FIELD_size];
+        uint32_t registers_count = instr->fields[FIELD_regs_n];
+        uint32_t base_register = instr->fields[FIELD_d];
+        uint32_t memory_location_register = instr->fields[FIELD_Rn];
+
+        for (uint32_t register_idx = 0; register_idx < registers_count; register_idx++) {
+            uint32_t target_register = base_register + register_idx;
+
+            il.AddInstruction(
+                il.SetRegister(
+                    8,
+                    target_register,
+                    il.ZeroExtend(
+                        8,
+                        il.Load(
+                            data_type_size_bytes,
+                            il.Add(
+                                4,
+                                ReadRegister(il, instr, memory_location_register),
+                                il.Const(4, register_idx * data_type_size_bytes)
+                            )
+                        )
+                    )
+                )
+            );
+        }
+
+        uint32_t writeback = instr->fields[FIELD_wback];
+        if (writeback == 1) {
+            uint32_t Rm = instr->fields[FIELD_Rm];
+            bool register_index = Rm != 15 && Rm != 13;
+
+            il.AddInstruction(
+                il.SetRegister(
+                    4,
+                    memory_location_register,
+                    il.Add(
+                        4,
+                        il.Register(4, memory_location_register),
+                        register_index
+                            ? il.Register(4, Rm)
+                            : il.Const(4, registers_count * data_type_size_bytes)
+                    )
+                )
+            );
+        }
+        break;
+    }
+
 	default:
 		il.AddInstruction(il.Unimplemented());
 		break;
