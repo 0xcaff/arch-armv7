@@ -1310,11 +1310,9 @@ bool GetLowLevelILForThumbInstruction(Architecture* arch, LowLevelILFunction& il
 	return true;
 }
 
-void HandleWriteback(LowLevelILFunction& il, decomp_result* instr) {
+void HandleWriteback(LowLevelILFunction& il, decomp_result* instr, uint32_t data_type_size_bytes, uint32_t registers_count) {
     uint32_t size = instr->fields[FIELD_size];
     uint32_t memory_location_register = instr->fields[FIELD_Rn];
-    uint32_t registers_count = instr->fields[FIELD_regs_n];
-    uint32_t data_type_size_bytes = 1 << size;
 
     uint32_t writeback = instr->fields[FIELD_wback];
     if (writeback == 1) {
@@ -1394,7 +1392,7 @@ bool GetLowLevelILForNEONInstruction(Architecture* arch, LowLevelILFunction& il,
         uint32_t memory_location_register = instr->fields[FIELD_Rn];
 
         for (uint32_t register_idx = 0; register_idx < registers_count; register_idx++) {
-            uint32_t target_register = base_register + register_idx;
+            uint32_t target_register = base_register + register_idx + REG_D0;
 
             il.AddInstruction(
                 il.SetRegister(
@@ -1415,7 +1413,7 @@ bool GetLowLevelILForNEONInstruction(Architecture* arch, LowLevelILFunction& il,
             );
         }
 
-        HandleWriteback(il, instr);
+        HandleWriteback(il, instr, data_type_size_bytes, registers_count);
 
         break;
     }
@@ -1430,7 +1428,7 @@ bool GetLowLevelILForNEONInstruction(Architecture* arch, LowLevelILFunction& il,
         uint32_t data_type_size_bytes = 1 << size;
         uint32_t elements_count = 8 / data_type_size_bytes;
 
-        uint32_t registers_count = instr->fields[FIELD_regs_n];
+        uint32_t registers_count = instr->fields[FIELD_regs];
         uint32_t base_register = instr->fields[FIELD_d];
         uint32_t memory_location_register = instr->fields[FIELD_Rn];
 
@@ -1440,7 +1438,7 @@ bool GetLowLevelILForNEONInstruction(Architecture* arch, LowLevelILFunction& il,
         }
 
         for (uint32_t register_idx = 0; register_idx < registers_count; register_idx++) {
-            uint32_t target_register = base_register + register_idx;
+            uint32_t target_register = base_register + register_idx + REG_D0;
 
             for (uint32_t element_idx = 0; element_idx < elements_count; element_idx++) {
                 il.AddInstruction(
@@ -1449,15 +1447,15 @@ bool GetLowLevelILForNEONInstruction(Architecture* arch, LowLevelILFunction& il,
                         il.Add(
                             4,
                             ReadRegister(il, instr, memory_location_register),
-                            il.Const(4, (element_idx + register_idx * registers_count) * data_type_size_bytes)
+                            il.Const(4, (element_idx + register_idx * elements_count) * data_type_size_bytes)
                         ),
-                        ReadRegister(il, instr, target_register)
+                        il.Register(8, target_register)
                     )
                 );
             }
         }
 
-        HandleWriteback(il, instr);
+        HandleWriteback(il, instr, 8, registers_count);
 
         break;
     }
