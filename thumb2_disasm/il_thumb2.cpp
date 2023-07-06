@@ -1461,6 +1461,28 @@ bool GetLowLevelILForNEONInstruction(Architecture* arch, LowLevelILFunction& il,
         break;
     }
 
+    case armv7::ARMV7_VSTR: {
+        uint32_t register_operand = 0;
+        uint32_t register_size = GetRegisterSize(instr, register_operand);
+        uint32_t d = instr->fields[FIELD_d];
+
+        il.AddInstruction(
+            il.Store(
+                register_size,
+                il.Register(register_size, d),
+                GetMemoryAddress(
+                    il,
+                    instr,
+                    1,
+                    4,
+                    false
+                )
+            )
+        );
+
+        break;
+    }
+
 	default:
 		il.AddInstruction(il.Unimplemented());
 		break;
