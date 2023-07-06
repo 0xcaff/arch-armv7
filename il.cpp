@@ -638,24 +638,6 @@ void LoadOrStoreWithAdjustment(InstructionOperand& src,
 	}
 }
 
-uint32_t DataTypeToSize(DataType data_type) {
-    switch (data_type) {
-        case armv7::DT_8:
-            return 1;
-
-        case armv7::DT_16:
-            return 2;
-
-        case armv7::DT_32:
-            return 4;
-
-        case armv7::DT_64:
-            return 8;
-
-        default:
-            return -1;
-    }
-}
 
 bool GetLowLevelILForArmInstruction(Architecture* arch, uint64_t addr, LowLevelILFunction& il, Instruction& instr, size_t addrSize)
 {
@@ -4966,72 +4948,6 @@ bool GetLowLevelILForArmInstruction(Architecture* arch, uint64_t addr, LowLevelI
 				)
 			);
 			break;
-        case ARMV7_VLD1:
-            ConditionExecute(addrSize, instr.cond, instr, il,
-                [&](size_t addrSize, Instruction& instr, LowLevelILFunction& il) {
-                    InstructionOperand target_registers = op1;
-                    if (target_registers.cls != REG_LIST_DOUBLE) {
-                        return;
-                    }
-
-                    Register reg = target_registers.reg;
-                    Register base = REG_D0;
-
-                    size_t data_type_size = DataTypeToSize(instr.dataType);
-                    if (data_type_size == -1) {
-                        return;
-                    }
-
-                    uint32_t register_idx = 0;
-                    for (int32_t i = 31; i >= 0; i--) {
-                        bool is_valid_register = ((reg >> i) & 1) == 1;
-                        if (!is_valid_register) {
-                            continue;
-                        }
-
-                        auto target_register = (Register)(i + base);
-
-                        il.AddInstruction(
-                            il.SetRegister(
-                                8,
-                                target_register,
-                                il.ZeroExtend(
-                                    8,
-                                    il.Load(
-                                        data_type_size,
-                                        il.Add(
-                                            4,
-                                            ILREG(op2),
-                                            il.Const(4, register_idx * data_type_size)
-                                        )
-                                    )
-                                )
-                            )
-                        );
-
-                        register_idx++;
-                    }
-
-
-                    if (op2.flags.wb == 1) {
-                        il.AddInstruction(
-                            il.SetRegister(
-                                4,
-                                op2.reg,
-                                op3.cls == REG
-                                  ? ILREG(op3)
-                                  : il.Add(
-                                        4,
-                                        ILREG(op2),
-                                        il.Const(4, register_idx * data_type_size)
-                                    )
-                            )
-                        );
-                    }
-                }
-            );
-            break;
-
 		default:
 			//printf("Instruction: %s\n", get_operation(instr.operation));
 			ConditionExecute(il, instr.cond, il.Unimplemented());
