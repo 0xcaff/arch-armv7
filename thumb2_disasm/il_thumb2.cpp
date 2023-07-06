@@ -1310,7 +1310,8 @@ bool GetLowLevelILForThumbInstruction(Architecture* arch, LowLevelILFunction& il
 	return true;
 }
 
-void HandleWriteback(LowLevelILFunction& il, decomp_result* instr, uint32_t data_type_size_bytes, uint32_t registers_count) {
+void HandleWriteback(LowLevelILFunction& il, decomp_result* instr, uint32_t data_type_size_bytes, uint32_t registers_count)
+{
     uint32_t size = instr->fields[FIELD_size];
     uint32_t memory_location_register = instr->fields[FIELD_Rn];
 
@@ -1320,17 +1321,17 @@ void HandleWriteback(LowLevelILFunction& il, decomp_result* instr, uint32_t data
         bool register_index = Rm != 15 && Rm != 13;
 
         il.AddInstruction(
-                il.SetRegister(
-                        4,
-                        memory_location_register,
-                        il.Add(
-                                4,
-                                il.Register(4, memory_location_register),
-                                register_index
-                                ? il.Register(4, Rm)
-                                : il.Const(4, registers_count * data_type_size_bytes)
-                        )
-                )
+            il.SetRegister(
+                4,
+                memory_location_register,
+                il.Add(
+                    4,
+                    il.Register(4, memory_location_register),
+                    register_index
+                        ? il.Register(4, Rm)
+                        : il.Const(4, registers_count * data_type_size_bytes)
+                    )
+            )
         );
     }
 }
