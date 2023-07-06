@@ -1469,14 +1469,14 @@ bool GetLowLevelILForNEONInstruction(Architecture* arch, LowLevelILFunction& il,
         il.AddInstruction(
             il.Store(
                 register_size,
-                il.Register(register_size, d),
                 GetMemoryAddress(
-                    il,
-                    instr,
-                    1,
-                    4,
-                    false
-                )
+                        il,
+                        instr,
+                        1,
+                        4,
+                        false
+                ),
+                il.Register(register_size, d + REG_D0)
             )
         );
 
