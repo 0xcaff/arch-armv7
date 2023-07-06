@@ -1310,6 +1310,33 @@ bool GetLowLevelILForThumbInstruction(Architecture* arch, LowLevelILFunction& il
 	return true;
 }
 
+void HandleWriteback(LowLevelILFunction& il, decomp_result* instr) {
+    uint32_t size = instr->fields[FIELD_size];
+    uint32_t memory_location_register = instr->fields[FIELD_Rn];
+    uint32_t registers_count = instr->fields[FIELD_regs_n];
+    uint32_t data_type_size_bytes = 1 << size;
+
+    uint32_t writeback = instr->fields[FIELD_wback];
+    if (writeback == 1) {
+        uint32_t Rm = instr->fields[FIELD_Rm];
+        bool register_index = Rm != 15 && Rm != 13;
+
+        il.AddInstruction(
+                il.SetRegister(
+                        4,
+                        memory_location_register,
+                        il.Add(
+                                4,
+                                il.Register(4, memory_location_register),
+                                register_index
+                                ? il.Register(4, Rm)
+                                : il.Const(4, registers_count * data_type_size_bytes)
+                        )
+                )
+        );
+    }
+}
+
 bool GetLowLevelILForNEONInstruction(Architecture* arch, LowLevelILFunction& il, decomp_result* instr, bool ifThenBlock)
 {
 	(void)arch;
@@ -1355,7 +1382,13 @@ bool GetLowLevelILForNEONInstruction(Architecture* arch, LowLevelILFunction& il,
 		il.AddInstruction(WriteArithOperand(il, instr, il.Sub(GetRegisterSize(instr, 0), ReadILOperand(il, instr, 1), ReadILOperand(il, instr, 2))));
 		break;
     case armv7::ARMV7_VLD1: {
-        uint32_t data_type_size_bytes = 1 << instr->fields[FIELD_size];
+        if (IS_FIELD_PRESENT(instr, FIELD_index_align) || IS_FIELD_PRESENT(instr, FIELD_T)) {
+            il.AddInstruction(il.Unimplemented());
+            break;
+        }
+
+        uint32_t size = instr->fields[FIELD_size];
+        uint32_t data_type_size_bytes = 1 << size;
         uint32_t registers_count = instr->fields[FIELD_regs_n];
         uint32_t base_register = instr->fields[FIELD_d];
         uint32_t memory_location_register = instr->fields[FIELD_Rn];
@@ -1382,25 +1415,50 @@ bool GetLowLevelILForNEONInstruction(Architecture* arch, LowLevelILFunction& il,
             );
         }
 
-        uint32_t writeback = instr->fields[FIELD_wback];
-        if (writeback == 1) {
-            uint32_t Rm = instr->fields[FIELD_Rm];
-            bool register_index = Rm != 15 && Rm != 13;
+        HandleWriteback(il, instr);
 
-            il.AddInstruction(
-                il.SetRegister(
-                    4,
-                    memory_location_register,
-                    il.Add(
-                        4,
-                        il.Register(4, memory_location_register),
-                        register_index
-                            ? il.Register(4, Rm)
-                            : il.Const(4, registers_count * data_type_size_bytes)
-                    )
-                )
-            );
+        break;
+    }
+
+    case armv7::ARMV7_VST1: {
+        if (IS_FIELD_PRESENT(instr, FIELD_index_align)) {
+            il.AddInstruction(il.Unimplemented());
+            break;
         }
+
+        uint32_t size = instr->fields[FIELD_size];
+        uint32_t data_type_size_bytes = 1 << size;
+        uint32_t elements_count = 8 / data_type_size_bytes;
+
+        uint32_t registers_count = instr->fields[FIELD_regs_n];
+        uint32_t base_register = instr->fields[FIELD_d];
+        uint32_t memory_location_register = instr->fields[FIELD_Rn];
+
+        if (data_type_size_bytes == 8) {
+            il.AddInstruction(il.Unimplemented());
+            break;
+        }
+
+        for (uint32_t register_idx = 0; register_idx < registers_count; register_idx++) {
+            uint32_t target_register = base_register + register_idx;
+
+            for (uint32_t element_idx = 0; element_idx < elements_count; element_idx++) {
+                il.AddInstruction(
+                    il.Store(
+                        data_type_size_bytes,
+                        il.Add(
+                            4,
+                            ReadRegister(il, instr, memory_location_register),
+                            il.Const(4, (element_idx + register_idx * registers_count) * data_type_size_bytes)
+                        ),
+                        ReadRegister(il, instr, target_register)
+                    )
+                );
+            }
+        }
+
+        HandleWriteback(il, instr);
+
         break;
     }
 
